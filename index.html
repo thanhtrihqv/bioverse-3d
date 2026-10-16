@@ -1,0 +1,1236 @@
+<!DOCTYPE html>
+<html lang="vi" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BIOVERSE 3D – KHÁM PHÁ TẾ BÀO NHÂN SƠ</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Three.js for 3D simulation -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- OrbitControls for Three.js -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <!-- FontAwesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Inter', 'sans-serif'] },
+                    colors: {
+                        labDark: '#0B132B',
+                        labPanel: '#1C2541',
+                        labAccent: '#3A506B',
+                        labCyan: '#00F5D4',
+                        labBlue: '#4CC9F0',
+                        labPurple: '#7209B7'
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #0B132B; color: #E0FBFC; overflow: hidden; }
+        /* Custom scrollbar */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #1C2541; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb { background: #4CC9F0; border-radius: 4px; }
+        .glow-cyan { box-shadow: 0 0 15px rgba(0, 245, 212, 0.3); }
+        .glow-blue { box-shadow: 0 0 15px rgba(76, 201, 240, 0.3); }
+        canvas { display: block; outline: none; }
+    </style>
+</head>
+<body class="h-full flex flex-col select-none">
+
+    <!-- TOP HEADER -->
+    <header class="h-16 bg-labPanel border-b border-labAccent/40 px-6 flex items-center justify-between z-20 shrink-0">
+        <div class="flex items-center space-x-3">
+            <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-labCyan to-labBlue flex items-center justify-center glow-cyan">
+                <i class="fa-solid fa-atom text-labDark text-xl"></i>
+            </div>
+            <div>
+                <h1 class="font-bold text-lg tracking-wide text-white flex items-center gap-2">
+                    BIOVERSE 3D <span class="text-xs bg-labCyan/20 text-labCyan px-2 py-0.5 rounded border border-labCyan/40">Sinh học 10</span>
+                </h1>
+                <p class="text-xs text-slate-400">Khám phá Cấu trúc Tế bào nhân sơ</p>
+            </div>
+        </div>
+
+        <!-- Progress & Stats -->
+        <div class="flex items-center space-x-6">
+            <div class="hidden md:flex items-center bg-labDark/80 px-4 py-1.5 rounded-full border border-labAccent/40 space-x-3">
+                <div class="text-xs text-slate-300">Tiến độ khám phá: <span id="progress-text" class="text-labCyan font-bold">0/10</span></div>
+                <div class="w-24 bg-labAccent/50 h-2 rounded-full overflow-hidden">
+                    <div id="progress-bar" class="bg-gradient-to-r from-labCyan to-labBlue h-full w-0 transition-all duration-300"></div>
+                </div>
+            </div>
+            
+            <div class="flex items-center bg-labDark/80 px-3 py-1.5 rounded-full border border-labAccent/40 space-x-2">
+                <i class="fa-solid fa-star text-yellow-400"></i>
+                <span id="score-text" class="text-sm font-bold text-yellow-300">0 XP</span>
+            </div>
+
+            <div class="flex items-center space-x-2">
+                <button onclick="toggleTeacherMode()" id="teacher-btn" class="px-3 py-1.5 bg-labAccent/30 hover:bg-labAccent/60 text-labCyan text-xs rounded-lg border border-labCyan/30 transition flex items-center gap-1.5">
+                    <i class="fa-solid fa-chalkboard-user"></i> <span class="hidden sm:inline">Chế độ giáo viên</span>
+                </button>
+                <button onclick="openModal('guide-modal')" class="px-3 py-1.5 bg-labCyan text-labDark font-semibold text-xs rounded-lg hover:bg-labCyan/80 transition flex items-center gap-1.5 shadow-lg">
+                    <i class="fa-solid fa-book-open"></i> <span class="hidden sm:inline">Hướng dẫn</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- MAIN WORKSPACE -->
+    <div class="flex-1 flex overflow-hidden relative">
+
+        <!-- LEFT PANEL: Components Sidebar -->
+        <aside class="w-80 bg-labPanel/90 backdrop-blur border-r border-labAccent/40 flex flex-col z-10 transition-all duration-300" id="left-sidebar">
+            <div class="p-4 border-b border-labAccent/40 flex items-center justify-between">
+                <h2 class="font-semibold text-sm text-white flex items-center gap-2">
+                    <i class="fa-solid fa-layer-group text-labCyan"></i> Thành phần tế bào
+                </h2>
+                <div class="flex gap-1">
+                    <button onclick="switchTab('explore')" id="tab-explore-btn" class="px-2.5 py-1 text-xs rounded bg-labCyan text-labDark font-medium transition">Khám phá</button>
+                    <button onclick="switchTab('compare')" id="tab-compare-btn" class="px-2.5 py-1 text-xs rounded bg-labDark text-slate-300 hover:text-white transition">So sánh</button>
+                </div>
+            </div>
+
+            <!-- Tab 1: Explore Components -->
+            <div id="tab-explore" class="flex-1 overflow-y-auto p-3 space-y-2">
+                <p class="text-xs text-slate-400 px-1 mb-2">Nhấp chọn thành phần để tương tác 3D và xem cấu tạo chi tiết:</p>
+                <div id="component-list" class="space-y-1.5">
+                    <!-- Dynamically populated via JS -->
+                </div>
+            </div>
+
+            <!-- Tab 2: Compare Prokaryote vs Eukaryote -->
+            <div id="tab-compare" class="flex-1 overflow-y-auto p-3 hidden space-y-3 text-xs text-slate-300">
+                <h3 class="font-bold text-labCyan text-sm mb-1">So sánh Tế bào Nhân sơ & Nhân thực</h3>
+                <div class="bg-labDark/60 rounded-lg p-3 border border-labAccent/40 space-y-3">
+                    <div>
+                        <span class="font-semibold text-white block text-labBlue">1. Nhân tế bào:</span>
+                        <p class="mt-0.5">• Nhân sơ: Không có màng nhân (vùng nhân).</p>
+                        <p>• Nhân thực: Có màng nhân hoàn chỉnh.</p>
+                    </div>
+                    <div>
+                        <span class="font-semibold text-white block text-labBlue">2. Kích thước điển hình:</span>
+                        <p class="mt-0.5">• Nhân sơ: Nhỏ hơn (thường 1 - 5 µm).</p>
+                        <p>• Nhân thực: Lớn hơn (thường 10 - 100 µm).</p>
+                    </div>
+                    <div>
+                        <span class="font-semibold text-white block text-labBlue">3. Bào quan có màng:</span>
+                        <p class="mt-0.5">• Nhân sơ: Không có (không ti thể, lưới nội chất...).</p>
+                        <p>• Nhân thực: Có hệ thống bào quan có màng phức tạp.</p>
+                    </div>
+                    <div>
+                        <span class="font-semibold text-white block text-labBlue">4. Vật chất di truyền (ADN):</span>
+                        <p class="mt-0.5">• Nhân sơ: Phân tử ADN mạch kép dạng vòng.</p>
+                        <p>• Nhân thực: ADN mạch thẳng liên kết với histone tạo nhiễm sắc thể.</p>
+                    </div>
+                    <div>
+                        <span class="font-semibold text-white block text-labBlue">5. Ribosome:</span>
+                        <p class="mt-0.5">• Nhân sơ: Loại nhỏ (70S).</p>
+                        <p>• Nhân thực: Loại lớn hơn (80S).</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Learning Activities Footer in Sidebar -->
+            <div class="p-3 border-t border-labAccent/40 bg-labDark/40 grid grid-cols-2 gap-2">
+                <button onclick="openModal('quiz-modal')" class="py-2 px-3 bg-labAccent/40 hover:bg-labAccent text-white text-xs rounded-lg border border-labAccent transition flex items-center justify-center gap-1.5">
+                    <i class="fa-solid fa-puzzle-piece text-labCyan"></i> Trắc nghiệm
+                </button>
+                <button onclick="openModal('mission-modal')" class="py-2 px-3 bg-labAccent/40 hover:bg-labAccent text-white text-xs rounded-lg border border-labAccent transition flex items-center justify-center gap-1.5">
+                    <i class="fa-solid fa-list-check text-labBlue"></i> Nhiệm vụ
+                </button>
+            </div>
+        </aside>
+
+        <!-- CENTER VIEWPORT: 3D Model & Toolbars -->
+        <main class="flex-1 relative flex flex-col bg-gradient-to-radial from-labPanel to-labDark overflow-hidden">
+            
+            <!-- Floating Top HUD on Canvas -->
+            <div class="absolute top-4 left-4 z-10 flex flex-wrap gap-2 items-center pointer-events-auto">
+                <div class="bg-labDark/80 backdrop-blur px-3 py-1.5 rounded-lg border border-labAccent/50 text-xs text-slate-300 flex items-center gap-2">
+                    <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                    <span>Mô hình 3D Trực quan (Vi khuẩn hình que)</span>
+                </div>
+                <div class="bg-amber-500/10 border border-amber-500/30 text-amber-300 px-3 py-1.5 rounded-lg text-xs">
+                    <i class="fa-solid fa-triangle-exclamation mr-1"></i> Kích thước mô phỏng, không theo tỉ lệ thực
+                </div>
+            </div>
+
+            <!-- Teacher Mode Banner (Hidden by default) -->
+            <div id="teacher-banner" class="absolute top-4 right-4 z-10 hidden bg-purple-900/90 border border-purple-500 text-purple-200 px-4 py-2 rounded-xl text-xs backdrop-blur shadow-xl flex items-center gap-3">
+                <i class="fa-solid fa-chalkboard-user text-purple-300 text-base"></i>
+                <div>
+                    <span class="font-bold block text-white">Chế độ giáo viên đang bật</span>
+                    <span>Đang hiển thị nhãn trực tiếp & công cụ trình chiếu.</span>
+                </div>
+                <button onclick="toggleTeacherMode()" class="bg-purple-700 hover:bg-purple-600 px-2.5 py-1 rounded text-white font-medium ml-2">Tắt</button>
+            </div>
+
+            <!-- 3D Canvas Container -->
+            <div id="canvas-container" class="w-full flex-1 relative cursor-grab active:cursor-grabbing">
+                <!-- Three.js renders here -->
+            </div>
+
+            <!-- BOTTOM TOOLBAR -->
+            <div class="absolute bottom-6 left-1/2 -translate-x-1/2 z-10 bg-labPanel/90 backdrop-blur px-4 py-2.5 rounded-2xl border border-labAccent/60 shadow-2xl flex items-center gap-3 flex-wrap justify-center">
+                <button onclick="resetCamera()" class="p-2.5 bg-labDark hover:bg-labAccent text-slate-200 hover:text-white rounded-xl text-xs transition flex items-center gap-1.5 border border-labAccent/40" title="Đặt lại góc nhìn">
+                    <i class="fa-solid fa-house text-labCyan"></i> <span class="hidden md:inline">Toàn cảnh</span>
+                </button>
+                <div class="h-5 w-px bg-labAccent/60"></div>
+                
+                <button onclick="setViewMode('normal')" id="btn-mode-normal" class="px-3 py-2 bg-labCyan text-labDark font-medium rounded-xl text-xs transition shadow-md">
+                    Mặc định
+                </button>
+                <button onclick="setViewMode('cutaway')" id="btn-mode-cutaway" class="px-3 py-2 bg-labDark hover:bg-labAccent text-slate-200 hover:text-white rounded-xl text-xs transition border border-labAccent/40">
+                    Cắt lớp tế bào
+                </button>
+                <button onclick="setViewMode('transparent')" id="btn-mode-transparent" class="px-3 py-2 bg-labDark hover:bg-labAccent text-slate-200 hover:text-white rounded-xl text-xs transition border border-labAccent/40">
+                    Xuyên thấu lớp vỏ
+                </button>
+
+                <div class="h-5 w-px bg-labAccent/60"></div>
+
+                <!-- Layer Toggles -->
+                <div class="flex items-center gap-1 text-xs">
+                    <label class="flex items-center gap-1 cursor-pointer bg-labDark/60 px-2.5 py-2 rounded-xl border border-labAccent/30 hover:bg-labAccent/40">
+                        <input type="checkbox" id="toggle-capsule" checked onchange="toggleLayer('capsule')" class="accent-labCyan rounded">
+                        <span class="text-slate-300">Vỏ nhầy</span>
+                    </label>
+                    <label class="flex items-center gap-1 cursor-pointer bg-labDark/60 px-2.5 py-2 rounded-xl border border-labAccent/30 hover:bg-labAccent/40">
+                        <input type="checkbox" id="toggle-wall" checked onchange="toggleLayer('wall')" class="accent-labCyan rounded">
+                        <span class="text-slate-300">Thành tế bào</span>
+                    </label>
+                    <label class="flex items-center gap-1 cursor-pointer bg-labDark/60 px-2.5 py-2 rounded-xl border border-labAccent/30 hover:bg-labAccent/40">
+                        <input type="checkbox" id="toggle-flagella" checked onchange="toggleLayer('flagella')" class="accent-labCyan rounded">
+                        <span class="text-slate-300">Roi & Pili</span>
+                    </label>
+                </div>
+            </div>
+
+        </main>
+
+        <!-- RIGHT PANEL: Information & Scientific Details -->
+        <aside class="w-96 bg-labPanel/90 backdrop-blur border-l border-labAccent/40 flex flex-col z-10 transition-all duration-300" id="right-sidebar">
+            <div class="p-4 border-b border-labAccent/40 flex items-center justify-between">
+                <h2 class="font-semibold text-sm text-white flex items-center gap-2">
+                    <i class="fa-solid fa-circle-info text-labCyan"></i> Thông tin khoa học
+                </h2>
+                <button onclick="focusSelectedComponent()" id="focus-btn" class="px-2.5 py-1 bg-labCyan/20 hover:bg-labCyan/30 text-labCyan text-xs rounded border border-labCyan/40 transition flex items-center gap-1">
+                    <i class="fa-solid fa-crosshairs"></i> Quan sát riêng
+                </button>
+            </div>
+
+            <!-- Component Details Content Container -->
+            <div class="flex-1 overflow-y-auto p-4 space-y-4" id="info-content">
+                <!-- Populated dynamically via JS -->
+            </div>
+        </aside>
+
+    </div>
+
+    <!-- MODALS -->
+
+    <!-- 1. Guide Modal -->
+    <div id="guide-modal" class="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm hidden flex items-center justify-center p-4">
+        <div class="bg-labPanel border border-labAccent rounded-2xl max-w-2xl w-full p-6 shadow-2xl relative max-h-[90vh] overflow-y-auto">
+            <button onclick="closeModal('guide-modal')" class="absolute top-4 right-4 text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
+            <div class="flex items-center space-x-3 mb-4">
+                <div class="w-10 h-10 rounded-xl bg-labCyan/20 text-labCyan flex items-center justify-center text-xl">
+                    <i class="fa-solid fa-book-open"></i>
+                </div>
+                <div>
+                    <h3 class="text-lg font-bold text-white">Hướng dẫn khám phá Bioverse 3D</h3>
+                    <p class="text-xs text-slate-400">Cách sử dụng phòng thí nghiệm ảo Sinh học 10</p>
+                </div>
+            </div>
+            
+            <div class="space-y-4 text-sm text-slate-300">
+                <div class="bg-labDark p-3 rounded-xl border border-labAccent/40">
+                    <h4 class="font-semibold text-labCyan mb-1"><i class="fa-solid fa-cube mr-2"></i>Tương tác mô hình 3D</h4>
+                    <p class="text-xs text-slate-400">Nhấp chuột trái và kéo để xoay mô hình. Dùng con lăn chuột để phóng to/thu nhỏ. Nhấp vào bất kỳ bộ phận nào trên mô hình hoặc trong danh sách bên trái để chọn và xem cấu tạo chi tiết.</p>
+                </div>
+                <div class="bg-labDark p-3 rounded-xl border border-labAccent/40">
+                    <h4 class="font-semibold text-labCyan mb-1"><i class="fa-solid fa-sliders mr-2"></i>Chế độ quan sát & Lớp cấu trúc</h4>
+                    <p class="text-xs text-slate-400">Sử dụng thanh công cụ phía dưới để chuyển đổi giữa chế độ Mặc định, Cắt lớp tế bào, Xuyên thấu hoặc bật/tắt nhanh các lớp vỏ nhầy, thành tế bào, roi & pili.</p>
+                </div>
+                <div class="bg-labDark p-3 rounded-xl border border-labAccent/40">
+                    <h4 class="font-semibold text-labCyan mb-1"><i class="fa-solid fa-graduation-cap mr-2"></i>Hoạt động học tập & Thử thách</h4>
+                    <p class="text-xs text-slate-400">Tham gia phần "Trắc nghiệm" và "Nhiệm vụ phòng thí nghiệm" để củng cố kiến thức sinh học tế bào, tích lũy điểm kinh nghiệm XP và nhận huy hiệu danh giá.</p>
+                </div>
+            </div>
+
+            <div class="mt-6 flex justify-end">
+                <button onclick="closeModal('guide-modal')" class="px-5 py-2 bg-labCyan text-labDark font-semibold rounded-xl text-xs hover:bg-labCyan/80 transition">Đã hiểu, Bắt đầu khám phá!</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 2. Quiz Modal -->
+    <div id="quiz-modal" class="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm hidden flex items-center justify-center p-4">
+        <div class="bg-labPanel border border-labAccent rounded-2xl max-w-xl w-full p-6 shadow-2xl relative max-h-[90vh] overflow-y-auto">
+            <button onclick="closeModal('quiz-modal')" class="absolute top-4 right-4 text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
+            <div class="flex items-center space-x-3 mb-4">
+                <div class="w-10 h-10 rounded-xl bg-purple-500/20 text-purple-400 flex items-center justify-center text-xl">
+                    <i class="fa-solid fa-puzzle-piece"></i>
+                </div>
+                <div>
+                    <h3 class="text-lg font-bold text-white">Thử thách Nhà sinh học</h3>
+                    <p class="text-xs text-slate-400">Kiểm tra kiến thức cấu trúc tế bào nhân sơ</p>
+                </div>
+            </div>
+
+            <div id="quiz-container" class="space-y-4">
+                <!-- Populated via JS -->
+            </div>
+
+            <div class="mt-6 flex justify-between items-center">
+                <span id="quiz-score-display" class="text-xs text-labCyan font-medium">Điểm: 0/10</span>
+                <button onclick="nextQuizQuestion()" id="next-quiz-btn" class="px-4 py-2 bg-labCyan text-labDark font-semibold rounded-xl text-xs hover:bg-labCyan/80 transition hidden">Câu hỏi tiếp theo</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 3. Mission Modal -->
+    <div id="mission-modal" class="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm hidden flex items-center justify-center p-4">
+        <div class="bg-labPanel border border-labAccent rounded-2xl max-w-xl w-full p-6 shadow-2xl relative max-h-[90vh] overflow-y-auto">
+            <button onclick="closeModal('mission-modal')" class="absolute top-4 right-4 text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
+            <div class="flex items-center space-x-3 mb-4">
+                <div class="w-10 h-10 rounded-xl bg-labBlue/20 text-labBlue flex items-center justify-center text-xl">
+                    <i class="fa-solid fa-list-check"></i>
+                </div>
+                <div>
+                    <h3 class="text-lg font-bold text-white">Nhiệm vụ phòng thí nghiệm</h3>
+                    <p class="text-xs text-slate-400">Hoàn thành các mục tiêu thực hành</p>
+                </div>
+            </div>
+
+            <div id="mission-list" class="space-y-3">
+                <!-- Populated via JS -->
+            </div>
+
+            <div class="mt-6 flex justify-end">
+                <button onclick="closeModal('mission-modal')" class="px-5 py-2 bg-labAccent hover:bg-labAccent/80 text-white font-semibold rounded-xl text-xs transition">Đóng</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Custom Notification Toast -->
+    <div id="toast" class="fixed bottom-6 right-6 z-50 bg-labPanel border border-labCyan text-white px-4 py-3 rounded-xl shadow-2xl transform translate-y-20 opacity-0 transition-all duration-300 flex items-center gap-3">
+        <div class="w-8 h-8 rounded-lg bg-labCyan/20 text-labCyan flex items-center justify-center">
+            <i class="fa-solid fa-circle-check"></i>
+        </div>
+        <div>
+            <h5 id="toast-title" class="font-bold text-xs text-labCyan">Thông báo</h5>
+            <p id="toast-msg" class="text-xs text-slate-300">Nội dung thông báo...</p>
+        </div>
+    </div>
+
+    <!-- APPLICATION LOGIC & THREE.JS ENGINE -->
+    <script>
+        // --- SCIENTIFIC DATA REPOSITORY ---
+        const componentsData = {
+            capsule: {
+                id: 'capsule',
+                name: 'Vỏ nhầy (Capsule)',
+                position: 'Lớp bao ngoài cùng',
+                structure: 'Là lớp bao ngoài cùng ở một số vi khuẩn, thường được tạo bởi polysaccharide, đôi khi có thành phần khác tùy loài. Cấu trúc và thành phần vỏ có thể khác nhau giữa các loài.',
+                function: '- Giúp tế bào bám vào bề mặt hoặc vật chủ ở một số loài.\n- Hỗ trợ hạn chế mất nước trong những điều kiện nhất định.\n- Có thể góp phần bảo vệ vi khuẩn trước một số yếu tố bất lợi; ở một số vi khuẩn gây bệnh, vỏ góp phần tránh bị hệ miễn dịch nhận diện hoặc loại bỏ.',
+                recognition: 'Lớp màng bán trong suốt bọc phía ngoài cùng của tế bào.',
+                role: 'Bảo vệ bổ sung và hỗ trợ thích nghi môi trường.',
+                question: 'Nếu vi khuẩn sống trên một bề mặt trơn, khả năng bám dính có thể giúp chúng như thế nào?',
+                fact: 'Không phải mọi vi khuẩn đều có vỏ nhầy; đây là lớp áo giáp tùy chọn của nhiều loài vi khuẩn thích nghi ký sinh.',
+                color: 0x94A3B8,
+                opacity: 0.35
+            },
+            wall: {
+                id: 'wall',
+                name: 'Thành tế bào (Cell Wall)',
+                position: 'Nằm bên trong vỏ nhầy (hoặc ngoài cùng nếu không có vỏ)',
+                structure: 'Ở phần lớn vi khuẩn, thành tế bào chứa peptidoglycan. Thành tế bào vi khuẩn Gram dương và Gram âm có sự khác nhau về cấu trúc. Không áp dụng đặc điểm này cho toàn bộ sinh vật nhân sơ, vì cổ khuẩn có thành phần thành tế bào khác.',
+                function: '- Giúp duy trì hình dạng tế bào.\n- Tăng độ bền cơ học.\n- Giúp tế bào chống chịu áp suất thẩm thấu.',
+                recognition: 'Lớp vỏ cứng cáp dạng hình trụ bo tròn ôm lấy màng sinh chất.',
+                role: 'Độ bền cơ học và bảo vệ hình dạng tế bào.',
+                question: 'Điều gì có thể xảy ra với một tế bào vi khuẩn nếu thành tế bào bị phá hủy trong môi trường nhược trương?',
+                fact: 'Kháng sinh Penicillin tiêu diệt vi khuẩn bằng cách ức chế quá trình tổng hợp peptidoglycan của thành tế bào.',
+                color: 0x38BDF8,
+                opacity: 0.7
+            },
+            membrane: {
+                id: 'membrane',
+                name: 'Màng sinh chất (Plasma Membrane)',
+                position: 'Nằm ngay phía trong thành tế bào',
+                structure: 'Là lớp màng chủ yếu gồm lớp kép phospholipid và các protein màng. Màng sinh chất bao quanh tế bào chất.',
+                function: '- Kiểm soát chọn lọc sự vận chuyển các chất ra vào tế bào.\n- Tham gia nhiều quá trình chuyển hóa năng lượng ở vi khuẩn.\n- Góp phần duy trì môi trường bên trong tế bào.',
+                recognition: 'Lớp màng mỏng bao bọc trực tiếp khối tế bào chất bên trong.',
+                role: 'Trao đổi chất chọn lọc và duy trì môi trường sống.',
+                question: 'Vì sao tế bào cần kiểm soát những chất đi vào và đi ra thay vì cho mọi chất tự do đi qua?',
+                fact: 'Ở vi khuẩn, màng sinh chất còn gấp nếp tạo thành thể truyền (mesosome) hỗ trợ hô hấp tế bào.',
+                color: 0xEC4899,
+                opacity: 0.85
+            },
+            cytoplasm: {
+                id: 'cytoplasm',
+                name: 'Tế bào chất (Cytoplasm)',
+                position: 'Khoang bên trong màng sinh chất',
+                structure: 'Là phần vật chất bên trong màng sinh chất, chứa nước, ion, protein, các phân tử hữu cơ, ribosome và nhiều thành phần khác. Đây không phải một khoang rỗng.',
+                function: '- Là môi trường diễn ra nhiều phản ứng trao đổi chất.\n- Chứa các thành phần tham gia tổng hợp protein và duy trì hoạt động sống.',
+                recognition: 'Khối gel nền lấp đầy bên trong tế bào.',
+                role: 'Trung tâm diễn ra các phản ứng hóa sinh của tế bào.',
+                question: 'Nếu không có môi trường tế bào chất phù hợp, các phản ứng sinh hóa có thể diễn ra bình thường không?',
+                fact: 'Tế bào chất có độ nhớt cao, chứa hàng nghìn loại enzyme hoạt động liên tục không ngừng.',
+                color: 0x10B981,
+                opacity: 0.5
+            },
+            nucleoid: {
+                id: 'nucleoid',
+                name: 'Vùng nhân (Nucleoid)',
+                position: 'Khu vực trung tâm tế bào chất',
+                structure: 'Là vùng chứa vật chất di truyền chính của tế bào nhân sơ, thường là một phân tử ADN mạch kép dạng vòng ở vi khuẩn điển hình. Vùng nhân không có màng nhân bao bọc. Hình dạng và số lượng phân tử ADN có thể khác ở một số trường hợp.',
+                function: '- Lưu trữ thông tin di truyền.\n- Chỉ dẫn quá trình tổng hợp RNA và protein thông qua biểu hiện gene.\n- Truyền thông tin di truyền cho tế bào con trong quá trình phân chia.',
+                recognition: 'Khối ADN dạng sợi cuộn xoắn màu vàng ở trung tâm tế bào.',
+                role: 'Lưu trữ và truyền đạt thông tin di truyền.',
+                question: 'Nếu ADN chứa thông tin di truyền, điều gì có thể xảy ra khi thông tin ở một gene bị thay đổi?',
+                fact: 'Tế bào nhân sơ hoàn toàn không có màng nhân – đây là đặc điểm cốt lõi phân biệt với tế bào nhân thực.',
+                color: 0xFBBF24,
+                opacity: 0.95
+            },
+            ribosome: {
+                id: 'ribosome',
+                name: 'Ribosome (Loại 70S)',
+                position: 'Phân tán tự do trong tế bào chất',
+                structure: 'Ribosome của tế bào nhân sơ thuộc loại 70S, gồm hai tiểu đơn vị 50S và 30S. Ribosome được cấu tạo từ RNA ribosome và protein.',
+                function: '- Là nơi tổng hợp protein dựa trên thông tin được truyền từ mRNA.\n- Tham gia tạo ra các enzyme và protein cấu trúc cần thiết cho tế bào.',
+                recognition: 'Các hạt nhỏ li ti màu đỏ cam phân bố khắp tế bào chất.',
+                role: 'Nhà máy tổng hợp protein của tế bào.',
+                question: 'Nếu tế bào không thể tổng hợp protein, những hoạt động sống nào sẽ bị ảnh hưởng?',
+                fact: 'Một tế bào vi khuẩn có thể chứa tới hàng chục nghìn hạt ribosome để đáp ứng nhu cầu tổng hợp protein cực lớn.',
+                color: 0xEF4444,
+                opacity: 0.9
+            },
+            plasmid: {
+                id: 'plasmid',
+                name: 'Plasmid',
+                position: 'Tự do trong tế bào chất',
+                structure: 'Là phân tử ADN ngoài nhiễm sắc thể, thường có dạng vòng ở vi khuẩn. Plasmid có thể tự nhân đôi và có thể mang gene đem lại lợi thế trong những điều kiện nhất định.',
+                function: '- Mang các gene bổ sung cho tế bào.\n- Một số plasmid mang gene kháng kháng sinh hoặc gene liên quan đến khả năng thích nghi.\n- Một số plasmid có thể truyền giữa các tế bào trong những điều kiện thích hợp.',
+                recognition: 'Các vòng ADN nhỏ màu xanh lá nằm độc lập ngoài vùng nhân.',
+                role: 'Cung cấp tính trạng bổ sung (như kháng kháng sinh).',
+                question: 'Vì sao sự lan truyền plasmid mang gene kháng kháng sinh lại là vấn đề đáng quan tâm trong y học?',
+                fact: 'Vi khuẩn có thể trao đổi plasmid cho nhau qua quá trình tiếp hợp (conjugation) ngay cả khác loài.',
+                color: 0x34D399,
+                opacity: 0.95
+            },
+            flagella: {
+                id: 'flagella',
+                name: 'Roi (Flagellum)',
+                position: 'Mọc ra từ cực tế bào',
+                structure: 'Là cấu trúc dạng sợi dài, ở nhiều vi khuẩn có thành phần protein flagellin. Cấu trúc và cơ chế vận động có sự khác nhau giữa các nhóm sinh vật nhân sơ.',
+                function: '- Giúp tế bào di chuyển trong môi trường lỏng ở những loài có roi vận động.\n- Hỗ trợ di chuyển theo hướng có lợi trong một số điều kiện môi trường.',
+                recognition: 'Cấu trúc sợi dài uốn lượn vươn ra từ một đầu vi khuẩn.',
+                role: 'Cơ quan di chuyển linh hoạt trong môi trường lỏng.',
+                question: 'Nếu môi trường có chất dinh dưỡng tập trung ở một khu vực, khả năng di chuyển có thể mang lại lợi thế gì?',
+                fact: 'Roi vi khuẩn quay như một động cơ chân vịt nhờ năng lượng proton qua màng, đạt tốc độ cực nhanh so với kích thước tế bào.',
+                color: 0xA78BFA,
+                opacity: 0.9
+            },
+            pili: {
+                id: 'pili (Lông bám)',
+                name: 'Lông bám / Pili',
+                position: 'Bề mặt tế bào',
+                structure: 'Là những cấu trúc dạng sợi trên bề mặt của một số vi khuẩn, thường được cấu tạo từ protein. Các loại pili có thể có cấu trúc và chức năng khác nhau.',
+                function: '- Giúp vi khuẩn bám vào bề mặt hoặc tế bào chủ.\n- Một số pili chuyên biệt tham gia quá trình tiếp hợp và truyền vật chất di truyền giữa các tế bào.',
+                recognition: 'Các sợi lông ngắn tua tủa quanh bề mặt tế bào.',
+                role: 'Bám dính bề mặt và tiếp hợp truyền gene.',
+                question: 'Vì sao khả năng bám dính có thể giúp vi khuẩn tồn tại tốt hơn trên một bề mặt?',
+                fact: 'Pili giới tính (sex pilus) dài hơn giúp kết nối hai tế bào vi khuẩn để truyền plasmid.',
+                color: 0xF472B6,
+                opacity: 0.9
+            },
+            storage: {
+                id: 'storage',
+                name: 'Hạt dự trữ (Inclusion Body)',
+                position: 'Nằm trong tế bào chất',
+                structure: 'Là các hạt hoặc thể vùi chứa chất dự trữ trong tế bào chất. Thành phần có thể khác nhau tùy loài và điều kiện sống.',
+                function: '- Dự trữ một số chất dinh dưỡng hoặc nguyên liệu.\n- Cung cấp nguồn vật chất hay năng lượng khi điều kiện môi trường thay đổi, tùy loại chất dự trữ.',
+                recognition: 'Các hạt tròn dự trữ màu trắng/tím nhạt trong tế bào chất.',
+                role: 'Kho dự trữ dinh dưỡng và năng lượng.',
+                question: 'Khi nguồn dinh dưỡng bên ngoài giảm, chất dự trữ có thể giúp tế bào như thế nào?',
+                fact: 'Hạt dự trữ có thể chứa glycogen, polyphosphate hoặc lưu huỳnh tùy vào loài vi khuẩn.',
+                color: 0xC084FC,
+                opacity: 0.9
+            }
+        };
+
+        // --- QUIZ BANK ---
+        const quizQuestions = [
+            {
+                q: "Thành phần nào chứa thông tin di truyền chính của tế bào nhân sơ và không có màng bao bọc?",
+                options: ["Vùng nhân (Nucleoid)", "Plasmid", "Ribosome", "Màng sinh chất"],
+                answer: 0,
+                explain: "Vùng nhân chứa phân tử ADN mạch kép dạng vòng mang thông tin di truyền chính và đặc trưng không có màng nhân bao bọc."
+            },
+            {
+                q: "Bộ phận nào trong tế bào nhân sơ trực tiếp thực hiện quá trình tổng hợp protein?",
+                options: ["Thành tế bào", "Ribosome (70S)", "Vỏ nhầy", "Roi"],
+                answer: 1,
+                explain: "Ribosome (loại 70S) là nhà máy tổng hợp protein của tế bào dựa trên khuôn mẫu mRNA."
+            },
+            {
+                q: "Cấu trúc nào làm nhiệm vụ kiểm soát chọn lọc sự vận chuyển các chất ra vào tế bào nhân sơ?",
+                options: ["Thành tế bào", "Vỏ nhầy", "Màng sinh chất", "Tế bào chất"],
+                answer: 2,
+                explain: "Màng sinh chất là lớp màng bán thấm cấu tạo từ lớp kép phospholipid giúp kiểm soát chọn lọc các chất ra vào tế bào."
+            },
+            {
+                q: "Thành phần nào giúp vi khuẩn duy trì hình dạng và chống chịu áp suất thẩm thấu?",
+                options: ["Thành tế bào", "Plasmid", "Ribosome", "Hạt dự trữ"],
+                answer: 0,
+                explain: "Thành tế bào chứa peptidoglycan giúp tạo độ bền cơ học và bảo vệ hình dạng tế bào trước áp suất thẩm thấu."
+            },
+            {
+                q: "Cấu trúc dạng sợi nào giúp nhiều loài vi khuẩn di chuyển trong môi trường lỏng?",
+                options: ["Pili", "Roi (Flagellum)", "Vỏ nhầy", "Thể truyền"],
+                answer: 1,
+                explain: "Roi (Flagellum) là cơ quan vận động dạng sợi dài giúp vi khuẩn bơi trong môi trường lỏng."
+            },
+            {
+                q: "Phân tử ADN ngoài nhiễm sắc thể dạng vòng, có thể mang gene kháng kháng sinh ở vi khuẩn là gì?",
+                options: ["Vùng nhân", "Plasmid", "mRNA", "Ribosome"],
+                answer: 1,
+                explain: "Plasmid là ADN vòng nhỏ nằm ngoài vùng nhân, có khả năng tự nhân đôi và mang các gene đem lại lợi thế như kháng kháng sinh."
+            },
+            {
+                q: "Ribosome của tế bào nhân sơ thuộc loại nào?",
+                options: ["Loại 80S", "Loại 70S", "Loại 60S", "Loại 50S"],
+                answer: 1,
+                explain: "Ribosome nhân sơ thuộc loại 70S (gồm tiểu đơn vị lớn 50S và tiểu đơn vị nhỏ 30S)."
+            },
+            {
+                q: "Lớp bao ngoài cùng ở một số vi khuẩn giúp tăng khả năng bám dính và tránh hệ miễn dịch là:",
+                options: ["Thành tế bào", "Màng sinh chất", "Vỏ nhầy (Capsule)", "Tế bào chất"],
+                answer: 2,
+                explain: "Vỏ nhầy là lớp bọc ngoài cùng (thường là polysaccharide) có ở một số vi khuẩn giúp bám dính và bảo vệ."
+            },
+            {
+                q: "Điểm khác biệt cơ bản nhất giữa tế bào nhân sơ và tế bào nhân thực là gì?",
+                options: ["Có màng sinh chất hay không", "Có ribosome hay không", "Có màng nhân bao bọc vật chất di truyền hay không", "Có tế bào chất hay không"],
+                answer: 2,
+                explain: "Tế bào nhân sơ chưa có màng nhân hoàn chỉnh (chỉ có vùng nhân), trong khi tế bào nhân thực có màng nhân bao bọc nhân."
+            },
+            {
+                q: "Các hạt hoặc thể vùi trong tế bào chất có chức năng chính là gì?",
+                options: ["Tổng hợp protein", "Dự trữ chất dinh dưỡng và năng lượng", "Quang hợp", "Phân bào giảm nhiễm"],
+                answer: 1,
+                explain: "Hạt dự trữ (Inclusion body) chứa các chất dinh dưỡng hoặc nguyên liệu dự trữ để sử dụng khi môi trường thay đổi."
+            }
+        ];
+
+        // --- MISSIONS ---
+        const missionsData = [
+            { id: 'm1', title: 'Khám phá Vùng nhân', desc: 'Chọn và tìm hiểu chi tiết về vùng nhân chứa ADN.', target: 'nucleoid', done: false },
+            { id: 'm2', title: 'Khám phá Ribosome', desc: 'Tìm hiểu nhà máy tổng hợp protein 70S.', target: 'ribosome', done: false },
+            { id: 'm3', title: 'Quan sát Màng sinh chất', desc: 'Khám phá lớp màng kiểm soát chọn lọc chất.', target: 'membrane', done: false },
+            { id: 'm4', title: 'Kiểm tra Thành tế bào', desc: 'Xem cấu tạo thành tế bào chứa peptidoglycan.', target: 'wall', done: false },
+            { id: 'm5', title: 'Hoàn thành thử thách trắc nghiệm', desc: 'Trả lời đúng ít nhất 3 câu hỏi trắc nghiệm.', target: 'quiz', done: false }
+        ];
+
+        // --- APP STATE ---
+        let selectedComponentId = 'nucleoid';
+        let exploredComponents = new Set();
+        let userScore = 0;
+        let currentQuizIndex = 0;
+        let quizCorrectCount = 0;
+        let teacherModeActive = false;
+        let currentViewMode = 'normal'; // normal, cutaway, transparent
+        let layerVisibility = { capsule: true, wall: true, flagella: true };
+
+        // --- THREE.JS GLOBALS ---
+        let scene, camera, renderer, controls;
+        let cellGroup;
+        let meshMap = {}; // Maps component ID to 3D Mesh
+        let raycaster, mouse;
+        let hoveredMesh = null;
+
+        // --- INITIALIZATION ---
+        window.onload = function() {
+            initSidebarList();
+            initMissionsList();
+            initQuiz();
+            initThreeJS();
+            selectComponent('nucleoid');
+            updateProgress();
+
+            window.addEventListener('resize', onWindowResize);
+        };
+
+        // --- UI BUILDERS ---
+        function initSidebarList() {
+            const listEl = document.getElementById('component-list');
+            listEl.innerHTML = '';
+            for (let key in componentsData) {
+                let comp = componentsData[key];
+                let btn = document.createElement('div');
+                btn.id = `sidebar-item-${key}`;
+                btn.className = `p-2.5 rounded-xl border border-labAccent/40 bg-labDark/60 hover:bg-labAccent/40 cursor-pointer transition flex items-center justify-between group`;
+                btn.onclick = () => selectComponent(key);
+                btn.innerHTML = `
+                    <div class="flex items-center space-x-2.5">
+                        <div class="w-3 h-3 rounded-full" style="background-color: #${comp.color.toString(16).padStart(6, '0')}"></div>
+                        <span class="text-xs font-medium text-slate-200 group-hover:text-white">${comp.name}</span>
+                    </div>
+                    <i class="fa-solid fa-chevron-right text-xs text-slate-500 group-hover:text-labCyan"></i>
+                `;
+                listEl.appendChild(btn);
+            }
+        }
+
+        function switchTab(tab) {
+            const exploreBtn = document.getElementById('tab-explore-btn');
+            const compareBtn = document.getElementById('tab-compare-btn');
+            const exploreDiv = document.getElementById('tab-explore');
+            const compareDiv = document.getElementById('tab-compare');
+
+            if (tab === 'explore') {
+                exploreBtn.className = 'px-2.5 py-1 text-xs rounded bg-labCyan text-labDark font-medium transition';
+                compareBtn.className = 'px-2.5 py-1 text-xs rounded bg-labDark text-slate-300 hover:text-white transition';
+                exploreDiv.classList.remove('hidden');
+                compareDiv.classList.add('hidden');
+            } else {
+                compareBtn.className = 'px-2.5 py-1 text-xs rounded bg-labCyan text-labDark font-medium transition';
+                exploreBtn.className = 'px-2.5 py-1 text-xs rounded bg-labDark text-slate-300 hover:text-white transition';
+                compareDiv.classList.remove('hidden');
+                exploreDiv.classList.add('hidden');
+            }
+        }
+
+        function selectComponent(id) {
+            selectedComponentId = id;
+            let comp = componentsData[id];
+            if (!comp) return;
+
+            // Highlight in sidebar
+            for (let key in componentsData) {
+                let el = document.getElementById(`sidebar-item-${key}`);
+                if (el) {
+                    if (key === id) {
+                        el.className = 'p-2.5 rounded-xl border border-labCyan bg-labCyan/10 cursor-pointer flex items-center justify-between';
+                    } else {
+                        el.className = 'p-2.5 rounded-xl border border-labAccent/40 bg-labDark/60 hover:bg-labAccent/40 cursor-pointer transition flex items-center justify-between group';
+                    }
+                }
+            }
+
+            // Render info panel
+            const infoContainer = document.getElementById('info-content');
+            infoContainer.innerHTML = `
+                <div>
+                    <span class="text-[10px] uppercase tracking-wider text-labCyan font-bold bg-labCyan/10 px-2 py-0.5 rounded border border-labCyan/30">${comp.position}</span>
+                    <h3 class="text-base font-bold text-white mt-1.5">${comp.name}</h3>
+                </div>
+
+                <div class="space-y-3 text-xs text-slate-300">
+                    <div class="bg-labDark p-3 rounded-xl border border-labAccent/40">
+                        <h4 class="font-semibold text-labCyan mb-1"><i class="fa-solid fa-gears mr-1.5"></i> Cấu tạo:</h4>
+                        <p class="leading-relaxed whitespace-pre-line text-slate-300">${comp.structure}</p>
+                    </div>
+
+                    <div class="bg-labDark p-3 rounded-xl border border-labAccent/40">
+                        <h4 class="font-semibold text-labBlue mb-1"><i class="fa-solid fa-bolt mr-1.5"></i> Chức năng:</h4>
+                        <p class="leading-relaxed whitespace-pre-line text-slate-300">${comp.function}</p>
+                    </div>
+
+                    <div class="bg-labDark p-3 rounded-xl border border-labAccent/40">
+                        <h4 class="font-semibold text-emerald-400 mb-1"><i class="fa-solid fa-eye mr-1.5"></i> Nhận biết trên mô hình:</h4>
+                        <p class="leading-relaxed text-slate-300">${comp.recognition}</p>
+                    </div>
+
+                    <div class="bg-gradient-to-r from-labCyan/10 to-transparent p-3 rounded-xl border-l-2 border-labCyan">
+                        <h4 class="font-semibold text-labCyan mb-1"><i class="fa-solid fa-lightbulb mr-1.5"></i> Câu hỏi khám phá:</h4>
+                        <p class="italic text-slate-200">"${comp.question}"</p>
+                    </div>
+
+                    <div class="bg-labDark/60 p-3 rounded-xl border border-labAccent/30 text-slate-400">
+                        <span class="font-semibold text-slate-300 block mb-0.5"><i class="fa-solid fa-circle-info text-yellow-400 mr-1"></i> Thông tin thực tế:</span>
+                        ${comp.fact}
+                    </div>
+                </div>
+            `;
+
+            // Track exploration
+            if (!exploredComponents.has(id)) {
+                exploredComponents.add(id);
+                userScore += 15;
+                updateProgress();
+                showToast("Đã khám phá thành công!", `Bạn vừa khám phá ${comp.name} (+15 XP)`);
+                checkMissionProgress(id);
+            }
+
+            // Highlight in 3D
+            highlight3DMesh(id);
+        }
+
+        function updateProgress() {
+            const count = exploredComponents.size;
+            document.getElementById('progress-text').innerText = `${count}/10`;
+            const pct = (count / 10) * 100;
+            document.getElementById('progress-bar').style.width = `${pct}%`;
+            document.getElementById('score-text').innerText = `${userScore} XP`;
+        }
+
+        // --- THREE.JS SIMULATION ENGINE ---
+        function initThreeJS() {
+            const container = document.getElementById('canvas-container');
+            scene = new THREE.Scene();
+
+            camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 1000);
+            camera.position.set(0, 5, 14);
+
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            renderer.setSize(container.clientWidth, container.clientHeight);
+            renderer.setPixelRatio(window.devicePixelRatio);
+            container.appendChild(renderer.domElement);
+
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            controls.maxDistance = 25;
+            controls.minDistance = 5;
+
+            // Lighting
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
+            scene.add(ambientLight);
+
+            const dirLight = new THREE.DirectionalLight(0xffffff, 1.2);
+            dirLight.position.set(10, 20, 15);
+            scene.add(dirLight);
+
+            const pointLight = new THREE.PointLight(0x00F5D4, 1, 50);
+            pointLight.position.set(-10, -10, -10);
+            scene.add(pointLight);
+
+            // Create Prokaryote Cell Group (Rod-shaped Bacterium)
+            cellGroup = new THREE.Group();
+            scene.add(cellGroup);
+
+            buildProkaryoteModel();
+
+            // Raycasting for clicking 3D parts
+            raycaster = new THREE.Raycaster();
+            mouse = new THREE.Vector2();
+
+            container.addEventListener('click', onCanvasClick);
+            container.addEventListener('mousemove', onCanvasMouseMove);
+
+            animate();
+        }
+
+        function createRodGeometry(radius, length) {
+            const group = new THREE.Group();
+            // Cylinder body
+            const cylGeo = new THREE.CylinderGeometry(radius, radius, length, 32);
+            const cylMat = new THREE.MeshStandardMaterial({ color: 0x38BDF8, roughness: 0.4 });
+            const cyl = new THREE.Mesh(cylGeo, cylMat);
+            group.add(cyl);
+
+            // Cap spheres
+            const sphereGeo = new THREE.SphereGeometry(radius, 32, 16);
+            const cap1 = new THREE.Mesh(sphereGeo, cylMat);
+            cap1.position.set(0, length / 2, 0);
+            group.add(cap1);
+
+            const cap2 = new THREE.Mesh(sphereGeo, cylMat);
+            cap2.position.set(0, -length / 2, 0);
+            group.add(cap2);
+
+            return group;
+        }
+
+        function buildProkaryoteModel() {
+            // 1. Capsule (Vỏ nhầy) - Outer transparent capsule group
+            const capsuleGroup = new THREE.Group();
+            const cRadius = 1.6;
+            const cLength = 2.0;
+            const capCylGeo = new THREE.CylinderGeometry(cRadius, cRadius, cLength, 32);
+            const capsuleMat = new THREE.MeshPhysicalMaterial({
+                color: componentsData.capsule.color,
+                transparent: true,
+                opacity: 0.25,
+                roughness: 0.1,
+                transmission: 0.6,
+                ior: 1.4
+            });
+            const capCyl = new THREE.Mesh(capCylGeo, capsuleMat);
+            capsuleGroup.add(capCyl);
+            const capSphereGeo = new THREE.SphereGeometry(cRadius, 32, 16);
+            const capS1 = new THREE.Mesh(capSphereGeo, capsuleMat);
+            capS1.position.set(0, cLength / 2, 0);
+            capsuleGroup.add(capS1);
+            const capS2 = new THREE.Mesh(capSphereGeo, capsuleMat);
+            capS2.position.set(0, -cLength / 2, 0);
+            capsuleGroup.add(capS2);
+
+            capsuleGroup.rotation.z = Math.PI / 2;
+            capsuleGroup.userData = { id: 'capsule' };
+            capsuleGroup.children.forEach(c => c.userData = { id: 'capsule' });
+            cellGroup.add(capsuleGroup);
+            meshMap['capsule'] = capsuleGroup;
+
+            // 2. Cell Wall (Thành tế bào)
+            const wallGroup = new THREE.Group();
+            const wRadius = 1.4;
+            const wLength = 1.8;
+            const wallCylGeo = new THREE.CylinderGeometry(wRadius, wRadius, wLength, 32);
+            const wallMat = new THREE.MeshStandardMaterial({
+                color: componentsData.wall.color,
+                roughness: 0.4,
+                metalness: 0.2
+            });
+            const wallCyl = new THREE.Mesh(wallCylGeo, wallMat);
+            wallGroup.add(wallCyl);
+            const wallSphereGeo = new THREE.SphereGeometry(wRadius, 32, 16);
+            const wS1 = new THREE.Mesh(wallSphereGeo, wallMat);
+            wS1.position.set(0, wLength / 2, 0);
+            wallGroup.add(wS1);
+            const wS2 = new THREE.Mesh(wallSphereGeo, wallMat);
+            wS2.position.set(0, -wLength / 2, 0);
+            wallGroup.add(wS2);
+
+            wallGroup.rotation.z = Math.PI / 2;
+            wallGroup.userData = { id: 'wall' };
+            wallGroup.children.forEach(c => c.userData = { id: 'wall' });
+            cellGroup.add(wallGroup);
+            meshMap['wall'] = wallGroup;
+
+            // 3. Plasma Membrane (Màng sinh chất)
+            const membGroup = new THREE.Group();
+            const mRadius = 1.32;
+            const mLength = 1.6;
+            const membCylGeo = new THREE.CylinderGeometry(mRadius, mRadius, mLength, 32);
+            const membMat = new THREE.MeshStandardMaterial({
+                color: componentsData.membrane.color,
+                roughness: 0.3,
+                transparent: true,
+                opacity: 0.85
+            });
+            const membCyl = new THREE.Mesh(membCylGeo, membMat);
+            membGroup.add(membCyl);
+            const membSphereGeo = new THREE.SphereGeometry(mRadius, 32, 16);
+            const mS1 = new THREE.Mesh(membSphereGeo, membMat);
+            mS1.position.set(0, mLength / 2, 0);
+            membGroup.add(mS1);
+            const mS2 = new THREE.Mesh(membSphereGeo, membMat);
+            mS2.position.set(0, -mLength / 2, 0);
+            membGroup.add(mS2);
+
+            membGroup.rotation.z = Math.PI / 2;
+            membGroup.userData = { id: 'membrane' };
+            membGroup.children.forEach(c => c.userData = { id: 'membrane' });
+            cellGroup.add(membGroup);
+            meshMap['membrane'] = membGroup;
+
+            // 4. Cytoplasm (Tế bào chất)
+            const cytoGroup = new THREE.Group();
+            const cytoRadius = 1.26;
+            const cytoLength = 1.4;
+            const cytoCylGeo = new THREE.CylinderGeometry(cytoRadius, cytoRadius, cytoLength, 32);
+            const cytoMat = new THREE.MeshStandardMaterial({
+                color: componentsData.cytoplasm.color,
+                roughness: 0.5,
+                transparent: true,
+                opacity: 0.45
+            });
+            const cytoCyl = new THREE.Mesh(cytoCylGeo, cytoMat);
+            cytoGroup.add(cytoCyl);
+            const cytoSphereGeo = new THREE.SphereGeometry(cytoRadius, 32, 16);
+            const cytoS1 = new THREE.Mesh(cytoSphereGeo, cytoMat);
+            cytoS1.position.set(0, cytoLength / 2, 0);
+            cytoGroup.add(cytoS1);
+            const cytoS2 = new THREE.Mesh(cytoSphereGeo, cytoMat);
+            cytoS2.position.set(0, -cytoLength / 2, 0);
+            cytoGroup.add(cytoS2);
+
+            cytoGroup.rotation.z = Math.PI / 2;
+            cytoGroup.userData = { id: 'cytoplasm' };
+            cytoGroup.children.forEach(c => c.userData = { id: 'cytoplasm' });
+            cellGroup.add(cytoGroup);
+            meshMap['cytoplasm'] = cytoGroup;
+
+            // 5. Nucleoid (Vùng nhân - ADN dạng vòng cuộn xoắn)
+            const nucleoidGroup = new THREE.Group();
+            const curveMat = new THREE.MeshStandardMaterial({ color: componentsData.nucleoid.color, roughness: 0.2 });
+            for (let i = 0; i < 6; i++) {
+                const torusGeo = new THREE.TorusGeometry(0.4 + i*0.08, 0.05, 16, 32);
+                const torus = new THREE.Mesh(torusGeo, curveMat);
+                torus.rotation.x = Math.random() * Math.PI;
+                torus.rotation.y = Math.random() * Math.PI;
+                nucleoidGroup.add(torus);
+            }
+            nucleoidGroup.position.set(0, 0, 0);
+            nucleoidGroup.userData = { id: 'nucleoid' };
+            nucleoidGroup.children.forEach(c => c.userData = { id: 'nucleoid' });
+            cellGroup.add(nucleoidGroup);
+            meshMap['nucleoid'] = nucleoidGroup;
+
+            // 6. Ribosomes (Hạt 70S li ti)
+            const riboGroup = new THREE.Group();
+            const riboGeo = new THREE.SphereGeometry(0.06, 8, 8);
+            const riboMat = new THREE.MeshStandardMaterial({ color: componentsData.ribosome.color });
+            for (let i = 0; i < 50; i++) {
+                const rMesh = new THREE.Mesh(riboGeo, riboMat);
+                rMesh.position.set(
+                    (Math.random() - 0.5) * 2.0,
+                    (Math.random() - 0.5) * 1.0,
+                    (Math.random() - 0.5) * 1.0
+                );
+                riboGroup.add(rMesh);
+            }
+            riboGroup.userData = { id: 'ribosome' };
+            riboGroup.children.forEach(c => c.userData = { id: 'ribosome' });
+            cellGroup.add(riboGroup);
+            meshMap['ribosome'] = riboGroup;
+
+            // 7. Plasmids (ADN vòng nhỏ)
+            const plasmidGroup = new THREE.Group();
+            const pMat = new THREE.MeshStandardMaterial({ color: componentsData.plasmid.color, roughness: 0.3 });
+            for (let i = 0; i < 3; i++) {
+                const pGeo = new THREE.TorusGeometry(0.18, 0.03, 12, 24);
+                const pMesh = new THREE.Mesh(pGeo, pMat);
+                pMesh.position.set((Math.random() - 0.5) * 1.5, (Math.random() - 0.5) * 0.8, (Math.random() - 0.5) * 0.8);
+                pMesh.rotation.x = Math.random() * Math.PI;
+                plasmidGroup.add(pMesh);
+            }
+            plasmidGroup.userData = { id: 'plasmid' };
+            plasmidGroup.children.forEach(c => c.userData = { id: 'plasmid' });
+            cellGroup.add(plasmidGroup);
+            meshMap['plasmid'] = plasmidGroup;
+
+            // 8. Flagella (Roi)
+            const flagellaGroup = new THREE.Group();
+            const flagCurve = new THREE.CylinderGeometry(0.03, 0.02, 4, 8);
+            const flagMat = new THREE.MeshStandardMaterial({ color: componentsData.flagella.color });
+            const flagMesh = new THREE.Mesh(flagCurve, flagMat);
+            flagMesh.position.set(2.8, 0, 0);
+            flagMesh.rotation.z = Math.PI / 3;
+            flagellaGroup.add(flagMesh);
+            flagellaGroup.userData = { id: 'flagella' };
+            flagellaGroup.children.forEach(c => c.userData = { id: 'flagella' });
+            cellGroup.add(flagellaGroup);
+            meshMap['flagella'] = flagellaGroup;
+
+            // 9. Pili (Lông bám)
+            const piliGroup = new THREE.Group();
+            const piliMat = new THREE.MeshStandardMaterial({ color: componentsData.pili.color });
+            for (let i = 0; i < 20; i++) {
+                const pGeo = new THREE.CylinderGeometry(0.015, 0.015, 0.4, 6);
+                const pMesh = new THREE.Mesh(pGeo, piliMat);
+                const theta = Math.random() * Math.PI * 2;
+                const phi = (Math.random() - 0.5) * Math.PI;
+                pMesh.position.set(Math.cos(phi)*Math.cos(theta)*1.6, Math.sin(phi)*1.6, Math.cos(phi)*Math.sin(theta)*1.6);
+                pMesh.lookAt(pMesh.position.clone().multiplyScalar(2));
+                piliGroup.add(pMesh);
+            }
+            piliGroup.userData = { id: 'pili' };
+            piliGroup.children.forEach(c => c.userData = { id: 'pili' });
+            cellGroup.add(piliGroup);
+            meshMap['pili'] = piliGroup;
+
+            // 10. Inclusion Body / Storage (Hạt dự trữ)
+            const storageGroup = new THREE.Group();
+            const sMat = new THREE.MeshStandardMaterial({ color: componentsData.storage.color });
+            for (let i = 0; i < 4; i++) {
+                const sGeo = new THREE.SphereGeometry(0.12, 12, 12);
+                const sMesh = new THREE.Mesh(sGeo, sMat);
+                sMesh.position.set((Math.random() - 0.5) * 1.2, (Math.random() - 0.5) * 0.6, (Math.random() - 0.5) * 0.6);
+                storageGroup.add(sMesh);
+            }
+            storageGroup.userData = { id: 'storage' };
+            storageGroup.children.forEach(c => c.userData = { id: 'storage' });
+            cellGroup.add(storageGroup);
+            meshMap['storage'] = storageGroup;
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+
+            // Gentle floating rotation
+            if (cellGroup) {
+                cellGroup.rotation.y += 0.002;
+            }
+
+            renderer.render(scene, camera);
+        }
+
+        function onWindowResize() {
+            const container = document.getElementById('canvas-container');
+            camera.aspect = container.clientWidth / container.clientHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(container.clientWidth, container.clientHeight);
+        }
+
+        function onCanvasClick(event) {
+            const container = document.getElementById('canvas-container');
+            const rect = container.getBoundingClientRect();
+            mouse.x = ((event.clientX - rect.left) / container.clientWidth) * 2 - 1;
+            mouse.y = -((event.clientY - rect.top) / container.clientHeight) * 2 + 1;
+
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObjects(cellGroup.children, true);
+
+            if (intersects.length > 0) {
+                let obj = intersects[0].object;
+                let targetId = null;
+                // Traverse up to find userData id
+                while (obj && !targetId && obj !== scene) {
+                    if (obj.userData && obj.userData.id) {
+                        targetId = obj.userData.id;
+                    }
+                    obj = obj.parent;
+                }
+                if (targetId && componentsData[targetId]) {
+                    selectComponent(targetId);
+                }
+            }
+        }
+
+        function onCanvasMouseMove(event) {
+            const container = document.getElementById('canvas-container');
+            const rect = container.getBoundingClientRect();
+            mouse.x = ((event.clientX - rect.left) / container.clientWidth) * 2 - 1;
+            mouse.y = -((event.clientY - rect.top) / container.clientHeight) * 2 + 1;
+
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObjects(cellGroup.children, true);
+
+            if (intersects.length > 0) {
+                container.style.cursor = 'pointer';
+            } else {
+                container.style.cursor = 'grab';
+            }
+        }
+
+        function highlight3DMesh(id) {
+            for (let key in meshMap) {
+                let mesh = meshMap[key];
+                if (key === id) {
+                    // Highlight scale / emissive effect
+                    mesh.scale.set(1.05, 1.05, 1.05);
+                } else {
+                    mesh.scale.set(1, 1, 1);
+                }
+            }
+        }
+
+        function resetCamera() {
+            camera.position.set(0, 5, 14);
+            controls.target.set(0, 0, 0);
+            controls.update();
+            setViewMode('normal');
+            showToast("Góc nhìn", "Đã khôi phục toàn cảnh tế bào");
+        }
+
+        function focusSelectedComponent() {
+            let mesh = meshMap[selectedComponentId];
+            if (mesh) {
+                const pos = mesh.position;
+                camera.position.set(pos.x, pos.y + 2, pos.z + 4);
+                controls.target.copy(pos);
+                controls.update();
+                showToast("Quan sát riêng", `Đã đưa camera đến gần ${componentsData[selectedComponentId].name}`);
+            }
+        }
+
+        function setViewMode(mode) {
+            currentViewMode = mode;
+            document.getElementById('btn-mode-normal').className = mode === 'normal' ? 'px-3 py-2 bg-labCyan text-labDark font-medium rounded-xl text-xs transition shadow-md' : 'px-3 py-2 bg-labDark hover:bg-labAccent text-slate-200 hover:text-white rounded-xl text-xs transition border border-labAccent/40';
+            document.getElementById('btn-mode-cutaway').className = mode === 'cutaway' ? 'px-3 py-2 bg-labCyan text-labDark font-medium rounded-xl text-xs transition shadow-md' : 'px-3 py-2 bg-labDark hover:bg-labAccent text-slate-200 hover:text-white rounded-xl text-xs transition border border-labAccent/40';
+            document.getElementById('btn-mode-transparent').className = mode === 'transparent' ? 'px-3 py-2 bg-labCyan text-labDark font-medium rounded-xl text-xs transition shadow-md' : 'px-3 py-2 bg-labDark hover:bg-labAccent text-slate-200 hover:text-white rounded-xl text-xs transition border border-labAccent/40';
+
+            if (meshMap['capsule'] && meshMap['wall']) {
+                if (mode === 'normal') {
+                    meshMap['capsule'].visible = layerVisibility.capsule;
+                    meshMap['wall'].visible = layerVisibility.wall;
+                    meshMap['capsule'].material.opacity = 0.25;
+                } else if (mode === 'cutaway') {
+                    // Simulate cutaway by scaling or hiding half
+                    meshMap['capsule'].visible = false;
+                    meshMap['wall'].scale.set(1, 1, 0.5);
+                } else if (mode === 'transparent') {
+                    meshMap['capsule'].visible = true;
+                    meshMap['capsule'].material.opacity = 0.1;
+                    meshMap['wall'].material.opacity = 0.3;
+                    meshMap['wall'].material.transparent = true;
+                }
+            }
+            showToast("Chế độ hiển thị", `Đã chuyển sang chế độ ${mode === 'normal' ? 'mặc định' : mode === 'cutaway' ? 'cắt lớp' : 'xuyên thấu'}`);
+        }
+
+        function toggleLayer(layerName) {
+            const checkbox = document.getElementById(`toggle-${layerName}`);
+            layerVisibility[layerName] = checkbox.checked;
+            if (meshMap[layerName]) {
+                meshMap[layerName].visible = checkbox.checked;
+            } else if (layerName === 'flagella') {
+                if (meshMap['flagella']) meshMap['flagella'].visible = checkbox.checked;
+                if (meshMap['pili']) meshMap['pili'].visible = checkbox.checked;
+            }
+        }
+
+        // --- TEACHER MODE ---
+        function toggleTeacherMode() {
+            teacherModeActive = !teacherModeActive;
+            const banner = document.getElementById('teacher-banner');
+            const btn = document.getElementById('teacher-btn');
+            if (teacherModeActive) {
+                banner.classList.remove('hidden');
+                btn.className = 'px-3 py-1.5 bg-purple-600 text-white text-xs rounded-lg border border-purple-400 transition flex items-center gap-1.5 shadow-lg';
+                showToast("Chế độ Giáo viên", "Đã kích hoạt bảng trình chiếu và công cụ lớp học.");
+            } else {
+                banner.classList.add('hidden');
+                btn.className = 'px-3 py-1.5 bg-labAccent/30 hover:bg-labAccent/60 text-labCyan text-xs rounded-lg border border-labCyan/30 transition flex items-center gap-1.5';
+                showToast("Chế độ Giáo viên", "Đã tắt chế độ giáo viên.");
+            }
+        }
+
+        // --- QUIZ LOGIC ---
+        function initQuiz() {
+            currentQuizIndex = 0;
+            quizCorrectCount = 0;
+            renderQuizQuestion();
+        }
+
+        function renderQuizQuestion() {
+            const container = document.getElementById('quiz-container');
+            const q = quizQuestions[currentQuizIndex];
+            
+            let html = `
+                <div class="bg-labDark p-4 rounded-xl border border-labAccent/40 space-y-3">
+                    <div class="flex justify-between items-center text-xs text-slate-400">
+                        <span>Câu hỏi ${currentQuizIndex + 1} / ${quizQuestions.length}</span>
+                        <span class="text-labCyan font-bold">Sinh học 10</span>
+                    </div>
+                    <h4 class="text-sm font-semibold text-white">${q.q}</h4>
+                    <div class="space-y-2 pt-2" id="quiz-options">
+            `;
+
+            q.options.forEach((opt, idx) => {
+                html += `
+                    <button onclick="answerQuiz(${idx})" class="w-full text-left p-3 rounded-xl bg-labPanel hover:bg-labAccent/40 border border-labAccent/40 text-xs text-slate-200 transition flex items-center justify-between group">
+                        <span><strong class="text-labCyan mr-2">${String.fromCharCode(65 + idx)}.</strong> ${opt}</span>
+                        <i class="fa-solid fa-circle-chevron-right text-slate-500 group-hover:text-labCyan"></i>
+                    </button>
+                `;
+            });
+
+            html += `</div><div id="quiz-feedback" class="mt-3 text-xs hidden"></div></div>`;
+            container.innerHTML = html;
+            document.getElementById('next-quiz-btn').classList.add('hidden');
+        }
+
+        function answerQuiz(selectedIdx) {
+            const q = quizQuestions[currentQuizIndex];
+            const feedbackDiv = document.getElementById('quiz-feedback');
+            feedbackDiv.classList.remove('hidden');
+
+            if (selectedIdx === q.answer) {
+                quizCorrectCount++;
+                userScore += 20;
+                updateProgress();
+                feedbackDiv.innerHTML = `<div class="p-3 bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 rounded-xl"><strong class="block mb-1"><i class="fa-solid fa-circle-check mr-1"></i> Chính xác!</strong>${q.explain}</div>`;
+                checkMissionProgress('quiz');
+            } else {
+                feedbackDiv.innerHTML = `<div class="p-3 bg-rose-500/20 border border-rose-500/40 text-rose-300 rounded-xl"><strong class="block mb-1"><i class="fa-solid fa-circle-xmark mr-1"></i> Chưa chính xác.</strong>Đáp án đúng là: <strong>${q.options[q.answer]}</strong>.<br>${q.explain}</div>`;
+            }
+
+            document.getElementById('quiz-score-display').innerText = `Đúng: ${quizCorrectCount} | Điểm: ${userScore} XP`;
+            
+            // Show next button or finish
+            if (currentQuizIndex < quizQuestions.length - 1) {
+                document.getElementById('next-quiz-btn').classList.remove('hidden');
+            } else {
+                document.getElementById('next-quiz-btn').innerText = 'Hoàn thành thử thách';
+                document.getElementById('next-quiz-btn').classList.remove('hidden');
+                document.getElementById('next-quiz-btn').onclick = () => {
+                    closeModal('quiz-modal');
+                    showToast("Xuất sắc!", `Bạn đã hoàn thành bài trắc nghiệm với ${quizCorrectCount}/${quizQuestions.length} câu đúng!`);
+                };
+            }
+        }
+
+        function nextQuizQuestion() {
+            currentQuizIndex++;
+            renderQuizQuestion();
+        }
+
+        // --- MISSIONS LOGIC ---
+        function initMissionsList() {
+            const listEl = document.getElementById('mission-list');
+            listEl.innerHTML = '';
+            missionsData.forEach(m => {
+                let div = document.createElement('div');
+                div.id = `mission-${m.id}`;
+                div.className = `p-3 rounded-xl border border-labAccent/40 bg-labDark flex items-center justify-between text-xs`;
+                div.innerHTML = `
+                    <div class="flex items-center space-x-3">
+                        <div id="mission-icon-${m.id}" class="w-7 h-7 rounded-lg bg-labAccent/40 text-slate-400 flex items-center justify-center">
+                            <i class="fa-solid fa-circle"></i>
+                        </div>
+                        <div>
+                            <h5 class="font-bold text-white">${m.title}</h5>
+                            <p class="text-slate-400 text-[11px]">${m.desc}</p>
+                        </div>
+                    </div>
+                    <span id="mission-status-${m.id}" class="px-2 py-1 rounded bg-slate-800 text-slate-400 font-medium">Chưa xong</span>
+                `;
+                listEl.appendChild(div);
+            });
+        }
+
+        function checkMissionProgress(targetId) {
+            missionsData.forEach(m => {
+                if (!m.done && m.target === targetId) {
+                    m.done = true;
+                    userScore += 50;
+                    updateProgress();
+                    
+                    const iconEl = document.getElementById(`mission-icon-${m.id}`);
+                    const statusEl = document.getElementById(`mission-status-${m.id}`);
+                    if (iconEl && statusEl) {
+                        iconEl.className = 'w-7 h-7 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center';
+                        iconEl.innerHTML = '<i class="fa-solid fa-check"></i>';
+                        statusEl.className = 'px-2 py-1 rounded bg-emerald-500/20 text-emerald-300 font-medium border border-emerald-500/40';
+                        statusEl.innerText = 'Hoàn thành (+50 XP)';
+                    }
+                    showToast("Nhiệm vụ hoàn thành!", `Xuất sắc! Bạn đã hoàn thành nhiệm vụ: ${m.title}`);
+                }
+            });
+        }
+
+        // --- UTILS ---
+        function openModal(id) {
+            document.getElementById(id).classList.remove('hidden');
+        }
+
+        function closeModal(id) {
+            document.getElementById(id).classList.add('hidden');
+        }
+
+        function showToast(title, msg) {
+            const toast = document.getElementById('toast');
+            document.getElementById('toast-title').innerText = title;
+            document.getElementById('toast-msg').innerText = msg;
+            toast.classList.remove('translate-y-20', 'opacity-0');
+            setTimeout(() => {
+                toast.classList.add('translate-y-20', 'opacity-0');
+            }, 3500);
+        }
+    </script>
+</body>
+</html>
